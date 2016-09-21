@@ -21,6 +21,16 @@
       height: 100%;
       width: 100%;
     }
+    .panel{
+      position: absolute;
+      top: 120px;
+      right: 0;
+      width: 400px;
+      height: 600px;
+      color: white;
+      overflow: auto;
+      z-index: 500;
+    }
   </style>
 
   <script>
@@ -30,22 +40,21 @@
         "esri/views/SceneView",
         "esri/layers/GraphicsLayer",
         "esri/Graphic",
-        "esri/symbols/PictureMarkerSymbol",
         "esri/symbols/PointSymbol3D",
         "esri/symbols/IconSymbol3DLayer",
-        "esri/symbols/ObjectSymbol3DLayer",
         "esri/geometry/Point",
+        "dojo/dom",
         "dojo/domReady!"
       ],
       function(
         Map, SceneView, GraphicsLayer,
         Graphic,
-        PictureMarkerSymbol,
         PointSymbol3D,
         IconSymbol3DLayer,
-        ObjectSymbol3DLayer,
-        Point
+        Point,
+        Dom
       ) {
+        var altitude = Dom.byId('altitude');
 
         var map = new Map({
           basemap: "satellite"
@@ -62,29 +71,27 @@
         });
 
         var satelliteLayer = new GraphicsLayer();
-        var satelliteTracks = new GraphicsLayer();
+        var satelliteTracks = new GraphicsLayer(); //TO-DO
         map.addMany([satelliteLayer, satelliteTracks]);
 
         rawData = [[0]];
 
-        var pod = new PictureMarkerSymbol({
-          url: "/telemachus/pod.png",
-          width: 32,
-          height: 32
-        });
         var template = {
           title: "{name}",
           content: "Surface velocity : {svel}",
         };
-        var redDot = new PointSymbol3D({
+        var icon = new PointSymbol3D({
           symbolLayers: [new IconSymbol3DLayer({
-            size: 16,  // points
-            resource: { 
+            resource: {
               primitive: "kite"
-              //,href: "/telemachus/pod.png"
+              ,href: "/telemachus/pod.png" //comment this line to use "kite"
             },
+            size: 32,
+            /* //customization for "kite"
+            size: 16,
             material: { color: "grey" },
             outline: { color: "white" }
+            */
           })]
         });
 
@@ -96,13 +103,15 @@
 
               var graphic = new Graphic({
                 geometry: new Point(d.longs, d.lat, d.alt),
-                symbol: redDot,
+                symbol: icon,
                 attributes: {
                   name: d.name,
                   svel: d.m
                 },
                 popupTemplate: template
               });
+
+              altitude.innerText = d.alt.toFixed(0);
 
               satelliteLayer.removeAll();
               satelliteLayer.add(graphic);
@@ -116,6 +125,10 @@
 
 </head>
 <body>
-  <div id="viewDiv"></div>
+  <div id="viewDiv">
+    <div class="panel">
+      <label>altitude : </label><div id="altitude"></div>
+    </div>
+  </div>
 </body>
 </html>
