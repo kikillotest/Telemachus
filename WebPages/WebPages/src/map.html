@@ -1,62 +1,121 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
-    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
-    <title>Kerbal Maps</title>
+  <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+  <title>Carte</title>
 
-    <link rel="stylesheet" type="text/css" href="leafletksp.css" />
-    <link rel="stylesheet" href="jKSPWAPICore.css" />
+  <link rel="stylesheet" href="jKSPWAPICore.css" />
 
-    <script type="text/javascript" src="leafletksp.js"></script>
+  <link rel="stylesheet" href="https://js.arcgis.com/4.0/esri/css/main.css">
+  <script src="https://js.arcgis.com/4.0/"></script>
 
-    <script type="text/javascript" src="jquery-1.9.1.min.js"></script>
-    <script type="text/javascript" src="jKSPWAPICore.js"></script>
-    <script>
-        function startMap() {
-            var previousBody = -1;
-            var newBody;
-            jQuery(document).ready(function ($) {
-                map = new L.KSP.Map('map', {
-                    layers: [L.KSP.CelestialBody.KERBIN],
-                    zoom: L.KSP.CelestialBody.KERBIN.defaultLayer.options.maxZoom,
-                    center: [-0.1027, -74.5754],
-                    bodyControl: false,
-                    layerControl: true,
-                    scaleControl: true
-                });
-                map.fitWorld();
-                rawData = [[0]];
-                var marker = [L.marker([0, 0]), L.marker([0, 0])];
-                marker[0].addTo(map);
-                jKSPWAPI.initPoll("longs=v.long&lat=v.lat&name=v.name&alt=v.altitude&m=v.surfaceVelocity&body=v.body", function (rawData) { }, function (rawData, d) {
+  <script type="text/javascript" src="jquery-1.9.1.min.js"></script>
+  <script type="text/javascript" src="jKSPWAPICore.js"></script>
 
-                    if (previousBody != d.body) {
-                        try {
-                            newBody = L.KSP.CelestialBody[d.body.toUpperCase()];
-                            newBody.addTo(map);
-                            previousBody = d.body;
-                        } catch (e) {
-                            if (d.body === undefined) {
-                                previousBody = d.body;
-                            } else {
-                                //alert("Body not supported yet. (" + d.body + ")")
-                                previousBody = -1;
-                            }
-                            
-                        }
-                    }
+  <style>
+    html,
+    body,
+    #viewDiv {
+      padding: 0;
+      margin: 0;
+      height: 100%;
+      width: 100%;
+    }
+  </style>
 
-                    if (!isNaN(d.lat) && !isNaN(d.longs)) {
-                        marker[0].setLatLng([d.lat, (d.longs > 180 ? d.longs - 360.0 : d.longs)]);
-                        marker[0].bindPopup(d.name + " </br>Altitude: " + d.alt + "</br>Surface Velocity: " + d.m);
-                        marker[0].update();
-                    }
-                }, rawData)
-            });
-        }
-    </script>
+  <script>
+    require(
+      [
+        "esri/Map",
+        "esri/views/SceneView",
+        "esri/layers/GraphicsLayer",
+        "esri/Graphic",
+        "esri/symbols/PictureMarkerSymbol",
+        "esri/symbols/PointSymbol3D",
+        "esri/symbols/IconSymbol3DLayer",
+        "esri/symbols/ObjectSymbol3DLayer",
+        "esri/geometry/Point",
+        "dojo/domReady!"
+      ],
+      function(
+        Map, SceneView, GraphicsLayer,
+        Graphic,
+        PictureMarkerSymbol,
+        PointSymbol3D,
+        IconSymbol3DLayer,
+        ObjectSymbol3DLayer,
+        Point
+      ) {
+
+        var map = new Map({
+          basemap: "satellite"
+        });
+
+        var view = new SceneView({
+          container: "viewDiv",
+          map: map,
+          constraints: {
+            altitude: {
+              max: 36000000000 // meters
+            }
+          }
+        });
+
+        var satelliteLayer = new GraphicsLayer();
+        var satelliteTracks = new GraphicsLayer();
+        map.addMany([satelliteLayer, satelliteTracks]);
+
+        rawData = [[0]];
+
+        var pod = new PictureMarkerSymbol({
+          url: "/telemachus/pod.png",
+          width: 32,
+          height: 32
+        });
+        var template = {
+          title: "{name}",
+          content: "Surface velocity : {svel}",
+        };
+        var redDot = new PointSymbol3D({
+          symbolLayers: [new IconSymbol3DLayer({
+            size: 16,  // points
+            resource: { 
+              primitive: "kite"
+              //,href: "/telemachus/pod.png"
+            },
+            material: { color: "grey" },
+            outline: { color: "white" }
+          })]
+        });
+
+        jKSPWAPI.initPoll(
+          "longs=v.long&lat=v.lat&name=v.name&alt=v.altitude&m=v.surfaceVelocity",
+          function (rawData) {},
+          function (rawData, d) {
+            if (!isNaN(d.lat) && !isNaN(d.longs)) {
+
+              var graphic = new Graphic({
+                geometry: new Point(d.longs, d.lat, d.alt),
+                symbol: redDot,
+                attributes: {
+                  name: d.name,
+                  svel: d.m
+                },
+                popupTemplate: template
+              });
+
+              satelliteLayer.removeAll();
+              satelliteLayer.add(graphic);
+            }
+          },
+          rawData
+        );
+      }
+    );
+  </script>
+
 </head>
-<body onload="startMap();" style="padding: 0; margin: 0;">
-    <div id="map" class="map" style="padding: 0; margin: 0; height: 100%;"></div>
+<body>
+  <div id="viewDiv"></div>
 </body>
 </html>
