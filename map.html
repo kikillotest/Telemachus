@@ -1,0 +1,187 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+  <title>Carte</title>
+
+  <link rel="stylesheet" href="jKSPWAPICore.css" />
+
+  <link rel="stylesheet" href="https://js.arcgis.com/4.0/esri/css/main.css">
+  <script src="https://js.arcgis.com/4.0/"></script>
+
+  <script src="jquery-1.9.1.min.js"></script>
+  <script src="jKSPWAPICore.js"></script>
+
+  <style>
+    html,
+    body,
+    #viewDiv {
+      padding: 0;
+      margin: 0;
+      height: 100%;
+      width: 100%;
+    }
+    .panel{
+      position: absolute;
+      top: 120px;
+      right: 0;
+      width: 400px;
+      height: 600px;
+      color: white;
+      overflow: auto;
+      z-index: 500;
+    }
+  </style>
+
+  <script>
+    require(
+      {
+        async: true,
+        parseOnLoad: true,
+        packages: [{
+          name: "d3",
+          location: "http://cdnjs.cloudflare.com/ajax/libs/d3/3.4.6/"
+        }]
+      },
+      [
+        "esri/Map",
+        "esri/views/SceneView",
+        "esri/layers/GraphicsLayer",
+        "esri/Graphic",
+        "esri/symbols/PointSymbol3D",
+        "esri/symbols/IconSymbol3DLayer",
+        "esri/geometry/Point",
+        "dojo/dom",
+        "d3/d3",
+        "dojo/domReady!"
+      ],
+      function(
+        Map, SceneView, GraphicsLayer,
+        Graphic,
+        PointSymbol3D,
+        IconSymbol3DLayer,
+        Point,
+        Dom,
+        d3
+      ) {
+        var altitude = Dom.byId('altitude');
+
+        var map = new Map({
+          basemap: "satellite"
+        });
+
+        var view = new SceneView({
+          container: "viewDiv",
+          map: map,
+          constraints: {
+            altitude: {
+              max: 36000000000 // meters
+            }
+          }
+        });
+
+        var satelliteLayer = new GraphicsLayer();
+        var satelliteTracks = new GraphicsLayer(); //TO-DO
+        map.addMany([satelliteLayer, satelliteTracks]);
+
+        rawData = [[0]];
+
+        var template = {
+          title: "{name}",
+          content: "Surface velocity : {svel}",
+        };
+        var icon = new PointSymbol3D({
+          symbolLayers: [new IconSymbol3DLayer({
+            resource: {
+              primitive: "kite"
+              ,href: "/telemachus/pod.png" //comment this line to use "kite"
+            },
+            size: 32,
+            /* //customization for "kite"
+            size: 16,
+            material: { color: "grey" },
+            outline: { color: "white" }
+            */
+          })]
+        });
+
+        var graphic = new Graphic({
+          geometry : new Point(),
+          attributes : {},
+          symbol: icon,
+          popupTemplate: template
+        });
+
+        function updateGeometry(newGeometry, newAttributes) {
+          satelliteLayer.remove(graphic);
+          var g = graphic.clone();
+          g.geometry = newGeometry;
+          g.attributes = newAttributes;
+          return g;
+        }
+
+        //This is the accessor function we talked about above
+        var lineFunction = d3.svg.line()
+          .x(function(d) { return d.x; })
+          .y(function(d) { return d.y; })
+          .interpolate("linear");
+
+        //The SVG Container
+        var svgContainer = d3.select("#graf").append("svg")
+          .attr("width", 200)
+          .attr("height", 200);
+
+        var x = 1;
+
+        jKSPWAPI.initPoll(
+          "longs=v.long&lat=v.lat&name=v.name&alt=v.altitude&m=v.surfaceVelocity&"+
+          "terrain=v.terrainHeight&apo=o.ApA&peri=o.PeA",
+          function (rawData) {},
+          function (rawData, d) {
+            if (!isNaN(d.lat) && !isNaN(d.longs)) {
+              var point = new Point(d.longs, d.lat, d.alt);
+              var attributes = {
+                name: d.name,
+                svel: d.m
+              };
+              graphic = updateGeometry(point, attributes);
+              satelliteLayer.add(graphic);
+              /*
+              altitude.innerText = d.alt.toFixed(0);
+              apoapsis.innerText = d.apo.toFixed(0);
+              periapsis.innerText = d.peri.toFixed(0);
+              terrain.innerText = d.terrain.toFixed(0);
+              */
+
+              var lineData = [];
+              lineData.push({"x": x, "y": d.terrain.toFixed(0)});
+
+              var lineGraph = svgContainer.append("path")
+                .attr("d", lineFunction(lineData))
+                .attr("stroke", "blue")
+                .attr("stroke-width", 2)
+                .attr("fill", "none");
+              x += 1;
+            }
+          },
+          rawData
+        );
+      }
+    );
+  </script>
+
+</head>
+<body>
+  <div id="viewDiv">
+    <div class="panel">
+<!--
+      <label>altitude : </label><div id="altitude"></div>
+      <label>apoapsis : </label><div id="apoapsis"></div>
+      <label>periapsis : </label><div id="periapsis"></div>
+      <label>terrain : </label><div id="terrain"></div>
+-->
+      <div id="graf"></div>
+    </div>
+  </div>
+</body>
+</html>
